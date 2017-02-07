@@ -84,10 +84,10 @@ def make_dict(results):
 
         sections.append(section)
 
-        data_dict = {
-            'title': titles, 'link': links, 'author': authors,
-            'body': bodies, 'section': sections, 'date': dates
-        }
+    data_dict = {
+        'title': titles, 'link': links, 'author': authors,
+        'body': bodies, 'section': sections, 'date': dates
+    }
     return data_dict
 
 def make_df(data_dict):
