@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import sys
 import pandas as pd
 from bs4 import BeautifulSoup
@@ -12,6 +14,7 @@ def make_soup(url):
     html = response.content
     soup = BeautifulSoup(html, 'html.parser')
     results = soup.find_all('article')
+    print response.status_code
     return results
 
 def make_dict(results):

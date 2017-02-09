@@ -12,7 +12,7 @@ import re
 
 def make_soup(url):
     #request = urllib2.Request(url)
-    #response = urllib2.urlopen(url) #request
+    #response = urllib2.urlopen(url)
     response = requests.get(url)
     html = response.content
     soup = BeautifulSoup(html.decode('utf-8', 'ignore'), 'html.parser')
@@ -36,6 +36,7 @@ def make_dict(results):
     for x in results:
         # get link
         link = x.find('a')['href']
+
         # set regex to eliminate interactive features
         match = re.search('^https://www.nytimes.com/20', link)
         if match:
@@ -47,6 +48,7 @@ def make_dict(results):
         cj = cookielib.CookieJar()
         opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
         new_soup = BeautifulSoup(opener.open(link).read().decode('utf-8', 'ignore'), 'html.parser')
+
         # get the article content
         body = new_soup.find_all('p', attrs = {'class': 'story-body-text story-content'})
         for p in body:
@@ -87,20 +89,23 @@ def main():
     'arts','world','technology']
     for x in section_list:
         url = 'http://www.nytimes.com/section/' + x
-        #url = raw_input('> ')
         results = make_soup(url)
         data_dict = make_dict(results)
         df = make_dataframe(data_dict)
+
         # create engine
         engine = create_engine('postgresql://teresaborcuch@localhost:5433/capstone')
         Session = sessionmaker(bind=engine)
         session = Session()
+
         # clear staging
         clear_staging_query = 'DELETE FROM nyt_staging *;'
         engine.execute(clear_staging_query)
         session.commit()
+
         # add df to staging
         df.to_sql('nyt_staging', engine, if_exists = 'append', index = False)
+
         # move unique rows from staging to ny_times
         move_unique_query = '''
         INSERT INTO ny_times (title, date, author, body, link, section)
@@ -112,8 +117,17 @@ def main():
         '''
         engine.execute(move_unique_query)
         session.commit()
+
+        # get current title count
+        title_count_query = '''
+        SELECT COUNT(DISTINCT title) FROM ny_times;
+        '''
+        print "New title count: " 
+        engine.execute(title_count_query)
         session.close()
+
         print "Done"
+
 
 if __name__ == "__main__":
     main()
