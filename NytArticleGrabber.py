@@ -117,13 +117,6 @@ def main():
         '''
         engine.execute(move_unique_query)
         session.commit()
-
-        # get current title count
-        title_count_query = '''
-        SELECT COUNT(DISTINCT title) FROM ny_times;
-        '''
-        print "New title count: " 
-        engine.execute(title_count_query)
         session.close()
 
         print "Done"

@@ -165,3 +165,98 @@ def evaluate_topic(data = None, section = None, source = None, topic = None):
     '''
 
     return score_dict
+
+class EvaluateTime():
+
+    def __init__(self, data = None, section = None, source = None, topic = None, date = None):
+        self.data = data
+        self.section = section
+        self.source = source
+        self.topic = topic
+        self.date = date
+
+    def call(self):
+        #self.plot_date_dict,
+        self.range_date_dict = self.make_dict()
+        return self
+
+    def make_dict(self):
+        # define masks
+        section_mask = (self.data['condensed_section'] == self.section)
+        source_mask = (self.data['source'] == self.source)
+        date_mask = (self.data['date'] > self.date)
+
+        # initialize lists for plot_date_dict
+        topic_scores = []
+        dates = []
+
+        # initialize other dict
+        range_date_dict = {}
+
+        if not self.date:
+            print "Please select a start date."
+
+        # make plot_date_dict from appropriate subset of data
+        else:
+            self.data = self.data[date_mask].sort_values(by = 'date')
+
+            if self.section and self.source:
+                self.data = self.data[section_mask & source_mask]
+
+            elif self.section:
+                self.data = self.data[section_mask]
+
+            elif self.source:
+                self.data = self.data[source_mask]
+
+            else:
+                self.data = self.data
+
+            for i, row in self.data.iterrows():
+
+                if self.topic in row[2]:
+                    topic_scores.append(row[6])
+                    dates.append(row[1])
+
+                # add to range_date_dict where keys are the dates and the vales are a list of scores
+                if row[1] not in range_date_dict.keys():
+                    range_date_dict[row[1]] = [row[6]]
+
+                elif row[1] in range_date_dict.keys():
+                    (range_date_dict[row[1]]).append(row[6])
+
+        #plot_date_dict = {'date': dates, 'score': topic_scores}
+
+        return range_date_dict #plot_date_dict,
+
+    def plot_time(self):
+
+        x = self.range_date_dict.keys()
+        x.sort()
+        ordered_x = []
+        y = []
+        for val in x:
+            ordered_x.append(val)
+            values = self.range_date_dict[val]
+            mean = np.mean(values)
+            y.append(mean)
+
+        # define upper and lower boundaries for error bars
+        upper_bounds = [max(self.range_date_dict[x]) for x in ordered_x]
+        lower_bounds = [min(self.range_date_dict[x]) for x in ordered_x]
+
+        # define distance for upper error bar
+        y_upper = zip(y, upper_bounds)
+        upper_error = [abs(pair[0] - pair[1]) for pair in y_upper]
+
+        # define distance for lower error bar
+        y_lower = zip(y, lower_bounds)
+        lower_error = [abs(pair[0] - pair[1]) for pair in y_lower]
+
+        asymmetric_error = [lower_error, upper_error]
+
+        plt.plot(ordered_x, y, c = 'r', marker = 'o')
+        plt.errorbar(ordered_x, y, yerr = asymmetric_error)
+        plt.xlim(min(ordered_x)+ timedelta(days = -1), max(ordered_x)+timedelta(days = 1))
+        plt.xticks(rotation = 70)
+        plt.show()
