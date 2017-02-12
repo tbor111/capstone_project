@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 from sqlalchemy import create_engine
-from datetime import datetime
+from datetime import datetime, timedelta
 import psycopg2
 import pandas as pd
 import numpy as np
@@ -9,6 +9,10 @@ import matplotlib.pyplot as plt
 from nltk.sentiment.util import *
 from nltk.corpus import sentiwordnet as swn
 from nltk.tag.perceptron import PerceptronTagger
+from nltk.tag import StanfordNERTagger
+from nltk.tokenize import word_tokenize
+import os
+
 
 class ArticleData():
     def __init__(self): pass
@@ -84,42 +88,44 @@ class ArticleData():
 
         data['condensed_section'] = [condense_section(x) for x in data['section']]
 
-        def compute_score(sentence):
-            tagger = PerceptronTagger()
-            taggedsentence = []
-            sent_score = []
-            taggedsentence.append(tagger.tag(sentence.split()))
-            wnl = nltk.WordNetLemmatizer()
-            for idx, words in enumerate(taggedsentence):
-                for idx2, t in enumerate(words):
-                    newtag = ''
-                    lemmatizedsent = wnl.lemmatize(t[0])
-                    if t[1].startswith('NN'):
-                        newtag = 'n'
-                    elif t[1].startswith('JJ'):
-                        newtag = 'a'
-                    elif t[1].startswith('V'):
-                        newtag = 'v'
-                    elif t[1].startswith('R'):
-                        newtag = 'r'
-                    else:
-                        newtag = ''
-                    if (newtag != ''):
-                        synsets = list(swn.senti_synsets(lemmatizedsent, newtag))
-                        score = 0.0
-                        if (len(synsets) > 0):
-                            for syn in synsets:
-                                score += syn.pos_score() - syn.neg_score()
-                            sent_score.append(score / len(synsets))
-                if (len(sent_score)==0 or len(sent_score)==1):
-                    return (float(0.0))
+def get_sent_scores(data = None):
+    def compute_score(sentence):
+        tagger = PerceptronTagger()
+        taggedsentence = []
+        sent_score = []
+        taggedsentence.append(tagger.tag(sentence.split()))
+        wnl = nltk.WordNetLemmatizer()
+        for idx, words in enumerate(taggedsentence):
+            for idx2, t in enumerate(words):
+                newtag = ''
+                lemmatizedsent = wnl.lemmatize(t[0])
+                if t[1].startswith('NN'):
+                    newtag = 'n'
+                elif t[1].startswith('JJ'):
+                    newtag = 'a'
+                elif t[1].startswith('V'):
+                    newtag = 'v'
+                elif t[1].startswith('R'):
+                    newtag = 'r'
                 else:
-                    return (sum([word_score for word_score in sent_score]) / (len(sent_score)))
-        data['SA_body'] = [compute_score(x) for x in data['body']]
-        data['SA_title'] = [compute_score(x) for x in data['title']]
-        data['SA_diff'] = abs(data['SA_title'] - data['SA_body'])
+                    newtag = ''
+                if (newtag != ''):
+                    synsets = list(swn.senti_synsets(lemmatizedsent, newtag))
+                    score = 0.0
+                    if (len(synsets) > 0):
+                        for syn in synsets:
+                            score += syn.pos_score() - syn.neg_score()
+                        sent_score.append(score / len(synsets))
+            if (len(sent_score)==0 or len(sent_score)==1):
+                return (float(0.0))
+            else:
+                return (sum([word_score for word_score in sent_score]) / (len(sent_score)))
+    data['SA_body'] = [compute_score(x) for x in data['body']]
+    data['SA_title'] = [compute_score(x) for x in data['title']]
+    data['SA_diff'] = abs(data['SA_title'] - data['SA_body'])
 
-        return data
+    return data
+
 
 def evaluate_topic(data = None, section = None, source = None, topic = None):
     topic_scores = []
@@ -166,6 +172,87 @@ def evaluate_topic(data = None, section = None, source = None, topic = None):
 
     return score_dict
 
+def count_entities(data = None, title = True):
+    # set up tagger
+    os.environ['CLASSPATH'] = "/Users/teresaborcuch/stanford-ner-2013-11-12/stanford-ner.jar"
+    os.environ['STANFORD_MODELS'] = '/Users/teresaborcuch/stanford-ner-2013-11-12/classifiers'
+    st = StanfordNERTagger('english.all.3class.distsim.crf.ser.gz')
+
+    tagged_titles = []
+    persons = []
+    places = []
+
+    for x in data[section]:
+        tokens = word_tokenize(x)
+        tags = st.tag(tokens)
+        tagged_titles.append(tags)
+
+    for pair_list in tagged_titles:
+        person_count = 0
+        place_count = 0
+        for pair in pair_list:
+            if pair[1] == 'PERSON':
+                person_count +=1
+            elif pair[1] == 'LOCATION':
+                place_count +=1
+            else:
+                continue
+        persons.append(person_count)
+        places.append(place_count)
+
+    if title:
+        data['total_persons_title'] = persons
+        data['total_places_title'] = places
+
+    else:
+        data['total_persons_body'] = persons
+        data['total_places_body'] = places
+
+    return data
+
+
+def evaluate_entities(data = None, section = None, source = None):
+    section_mask = (data['condensed_section'] == section)
+    source_mask = (data['source'] == source)
+
+    if section and source:
+        masked_data = data[section_mask & source_mask]
+
+    elif section:
+        masked_data = data[section_mask]
+
+    elif source:
+        masked_data = data[source_mask]
+
+    else:
+        masked_data = data
+
+    # set up tagger
+    os.environ['CLASSPATH'] = "/Users/teresaborcuch/stanford-ner-2013-11-12/stanford-ner.jar"
+    os.environ['STANFORD_MODELS'] = '/Users/teresaborcuch/stanford-ner-2013-11-12/classifiers'
+    st = StanfordNERTagger('english.all.3class.distsim.crf.ser.gz')
+    # dictionaries to hold counts of entities
+    person_dict = {}
+    place_dict = {}
+
+    for x in masked_data['body']:
+        tokens = word_tokenize(x)
+        tags = st.tag(tokens)
+        for pair in tags:
+            if pair[1] == 'PERSON':
+                if pair[0] not in person_dict.keys():
+                    person_dict[pair[0]] = 1
+                else:
+                    person_dict[pair[0]] +=1
+            elif pair[1] == 'LOCATION':
+                if pair[0] not in place_dict.keys():
+                    place_dict[pair[0]] = 1
+                else:
+                    place_dict[pair[0]] += 1
+
+    return person_dict, place_dict
+
+
 class EvaluateTime():
 
     def __init__(self, data = None, section = None, source = None, topic = None, date = None):
@@ -198,35 +285,32 @@ class EvaluateTime():
 
         # make plot_date_dict from appropriate subset of data
         else:
-            self.data = self.data[date_mask].sort_values(by = 'date')
-
             if self.section and self.source:
-                self.data = self.data[section_mask & source_mask]
+                masked_data = self.data[section_mask & source_mask & date_mask]
 
-            elif self.section:
-                self.data = self.data[section_mask]
+            elif self.section and (not self.source):
+                masked_data = self.data[section_mask & date_mask]
 
-            elif self.source:
-                self.data = self.data[source_mask]
+            elif self.source and (not self.section):
+                masked_data = self.data[source_mask & date_mask]
 
             else:
-                self.data = self.data
+                masked_data = self.data[date_mask]
 
-            for i, row in self.data.iterrows():
+            for i, row in masked_data.iterrows():
 
                 if self.topic in row[2]:
                     topic_scores.append(row[6])
                     dates.append(row[1])
 
-                # add to range_date_dict where keys are the dates and the vales are a list of scores
-                if row[1] not in range_date_dict.keys():
-                    range_date_dict[row[1]] = [row[6]]
+                    # add to range_date_dict where keys are the dates and the vales are a list of scores
+                    if row[1] not in range_date_dict.keys():
+                        range_date_dict[row[1]] = [row[6]]
 
-                elif row[1] in range_date_dict.keys():
-                    (range_date_dict[row[1]]).append(row[6])
+                    elif row[1] in range_date_dict.keys():
+                        (range_date_dict[row[1]]).append(row[6])
 
         #plot_date_dict = {'date': dates, 'score': topic_scores}
-
         return range_date_dict #plot_date_dict,
 
     def plot_time(self):
@@ -256,7 +340,7 @@ class EvaluateTime():
         asymmetric_error = [lower_error, upper_error]
 
         plt.plot(ordered_x, y, c = 'r', marker = 'o')
-        plt.errorbar(ordered_x, y, yerr = asymmetric_error)
-        plt.xlim(min(ordered_x)+ timedelta(days = -1), max(ordered_x)+timedelta(days = 1))
+        plt.errorbar(ordered_x, y, yerr = asymmetric_error, ecolor = 'r', capthick = 1)
+        plt.xlim(min(ordered_x) + timedelta(days = -1), max(ordered_x) + timedelta(days = 1))
         plt.xticks(rotation = 70)
         plt.show()

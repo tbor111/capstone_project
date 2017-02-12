@@ -119,7 +119,7 @@ def main():
         session.commit()
         session.close()
 
-        print "Done"
+        print "{} done".format(x)
 
 
 if __name__ == "__main__":

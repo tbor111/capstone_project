@@ -100,33 +100,36 @@ def main():
     'business', 'lifestyle','opinions','sports']
     for x in section_list:
         url = 'http://www.washingtonpost.com/' + x
-    #url = raw_input('> ')
+
         results = make_soup(url)
-        data_dict = make_dict(results)
-        df = make_df(data_dict)
-        # create engine
-        engine = create_engine('postgresql://teresaborcuch@localhost:5433/capstone')
-        Session = sessionmaker(bind=engine)
-        session = Session()
-        # clear staging
-        clear_staging_query = 'DELETE FROM wp_staging *;'
-        engine.execute(clear_staging_query)
-        session.commit()
-        # add df to staging
-        df.to_sql('wp_staging', engine, if_exists = 'append', index = False)
-        # move unique rows from staging to ny_times
-        move_unique_query = '''
-        INSERT INTO washington_post (title, date, author, body, link, section)
-        SELECT title, date, author, body, link, section
-        FROM wp_staging
-        WHERE NOT EXISTS (SELECT title, date, author, body, link, section
-        FROM washington_post
-        WHERE washington_post.title = wp_staging.title);
-        '''
-        engine.execute(move_unique_query)
-        session.commit()
-        session.close()
-        print "Done"
+        try:
+            data_dict = make_dict(results)
+            df = make_df(data_dict)
+            # create engine
+            engine = create_engine('postgresql://teresaborcuch@localhost:5433/capstone')
+            Session = sessionmaker(bind=engine)
+            session = Session()
+            # clear staging
+            clear_staging_query = 'DELETE FROM wp_staging *;'
+            engine.execute(clear_staging_query)
+            session.commit()
+            # add df to staging
+            df.to_sql('wp_staging', engine, if_exists = 'append', index = False)
+            # move unique rows from staging to ny_times
+            move_unique_query = '''
+            INSERT INTO washington_post (title, date, author, body, link, section)
+            SELECT title, date, author, body, link, section
+            FROM wp_staging
+            WHERE NOT EXISTS (SELECT title, date, author, body, link, section
+            FROM washington_post
+            WHERE washington_post.title = wp_staging.title);
+            '''
+            engine.execute(move_unique_query)
+            session.commit()
+            session.close()
+            print "Done"
+        except AttributeError:
+            pass
 
 if __name__ == "__main__":
     main()

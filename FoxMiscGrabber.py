@@ -87,31 +87,34 @@ def main():
 
     for url in urls:
         results = make_soup(url)
-        data_dict = make_dict(results)
-        df = make_df(data_dict)
+        try:
+            data_dict = make_dict(results)
+            df = make_df(data_dict)
 
-        engine = create_engine('postgresql://teresaborcuch@localhost:5433/capstone')
-        Session = sessionmaker(bind=engine)
-        session = Session()
-        # clear staging
-        clear_staging_query = 'DELETE FROM fox_staging *;'
-        engine.execute(clear_staging_query)
-        session.commit()
-        # add df to staging
-        df.to_sql('fox_staging', engine, if_exists = 'append', index = False)
-        # move unique rows from staging to ny_times
-        move_unique_query = '''
-        INSERT INTO fox_news (title, date, author, body, link, section)
-        SELECT title, date, author, body, link, section
-        FROM fox_staging
-        WHERE NOT EXISTS (SELECT title, date, author, body, link, section
-        FROM fox_news
-        WHERE fox_news.title = fox_staging.title);
-        '''
-        engine.execute(move_unique_query)
-        session.commit()
-        session.close()
-        print "Done"
+            engine = create_engine('postgresql://teresaborcuch@localhost:5433/capstone')
+            Session = sessionmaker(bind=engine)
+            session = Session()
+            # clear staging
+            clear_staging_query = 'DELETE FROM fox_staging *;'
+            engine.execute(clear_staging_query)
+            session.commit()
+            # add df to staging
+            df.to_sql('fox_staging', engine, if_exists = 'append', index = False)
+            # move unique rows from staging to ny_times
+            move_unique_query = '''
+            INSERT INTO fox_news (title, date, author, body, link, section)
+            SELECT title, date, author, body, link, section
+            FROM fox_staging
+            WHERE NOT EXISTS (SELECT title, date, author, body, link, section
+            FROM fox_news
+            WHERE fox_news.title = fox_staging.title);
+            '''
+            engine.execute(move_unique_query)
+            session.commit()
+            session.close()
+            print "{} done".format(url)
+        except AttributeError:
+            pass
 
 if __name__ == "__main__":
     main()
