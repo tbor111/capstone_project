@@ -1,4 +1,11 @@
 #!/usr/bin/env python
+
+'''
+Module that poplates ArticleData dataframes with articles from Postgres database as a service object. Includes functions for sentiment analysis with get_sent_score function and named entity recognition with count_entities and evaluate_entities methods.
+
+EvaluateTime objects populate dataframe with articles from the prescribed source, section, and on the specified topic. Sentiments on this topic can be plotted using the plot_time method.
+
+'''
 from sqlalchemy import create_engine
 from datetime import datetime, timedelta
 import psycopg2
@@ -12,9 +19,22 @@ from nltk.tag.perceptron import PerceptronTagger
 from nltk.tag import StanfordNERTagger
 from nltk.tokenize import word_tokenize
 import os
-
+import re
 
 class ArticleData():
+
+    '''
+    Usage:
+    >>> from articledata import *
+    >>> data = ArticleData().call()
+    >>> data = get_sent_scores(data = data)
+    >>> topic_data = evaluate_topic(data = data, section = 'opinion', source = 'NYT', topic = 'healthcare')
+    >>> data = count_entities(data = data, title = True)
+    >>> people_dict, place_dict = evaluate_entities(data = data, section = 'opinion', source = 'NYT')
+
+    '''
+
+
     def __init__(self): pass
 
     def call(self):
@@ -62,22 +82,32 @@ class ArticleData():
 
         data['date'] = new_dates
 
+        # eliminate | Fox News from titles
+        clean_titles = []
+        for x in data['title']:
+            match = re.search('\|.*$', x)
+            if match:
+                clean_x = re.sub('\|.*$','',x)
+                clean_titles.append(clean_x)
+            else:
+                clean_titles.append(x)
+        data['title'] = clean_titles
+
+
         # create the condensed section
         def condense_section(x):
             if 'world' in x:
                 section = 'world'
             elif 'pinion' in x:
                 section = 'opinion'
-            elif 'business' in x:
-                section = 'business'
+            elif ('business' in x) or ('tech' in x):
+                section = 'bus_tech'
             elif ('entertain' in x) or ('art' in x) or ('theater' in x) or ('book' in x) or ('movie' in x) or ('travel' in x) or ('fashion' in x) or ('style' in x) or ('dining' in x):
                 section = 'entertainment'
             elif 'sport' in x:
                 section = 'sports'
             elif ('health' in x) or ('science' in x) or ('well' in x):
                 section = 'sci_health'
-            elif('tech' in x):
-                section = 'technology'
             elif ('education' in x):
                 section = 'education'
             elif ('politic' in x) or ('us' in x):
@@ -87,6 +117,7 @@ class ArticleData():
             return section
 
         data['condensed_section'] = [condense_section(x) for x in data['section']]
+        return data
 
 def get_sent_scores(data = None):
     def compute_score(sentence):
@@ -182,29 +213,49 @@ def count_entities(data = None, title = True):
     persons = []
     places = []
 
-    for x in data[section]:
-        tokens = word_tokenize(x)
-        tags = st.tag(tokens)
-        tagged_titles.append(tags)
-
-    for pair_list in tagged_titles:
-        person_count = 0
-        place_count = 0
-        for pair in pair_list:
-            if pair[1] == 'PERSON':
-                person_count +=1
-            elif pair[1] == 'LOCATION':
-                place_count +=1
-            else:
-                continue
-        persons.append(person_count)
-        places.append(place_count)
-
     if title:
+
+        for x in data['title']:
+            tokens = word_tokenize(x)
+            tags = st.tag(tokens)
+            tagged_titles.append(tags)
+
+        for pair_list in tagged_titles:
+            person_count = 0
+            place_count = 0
+            for pair in pair_list:
+                if pair[1] == 'PERSON':
+                    person_count +=1
+                elif pair[1] == 'LOCATION':
+                    place_count +=1
+                else:
+                    continue
+            persons.append(person_count)
+            places.append(place_count)
+
+
         data['total_persons_title'] = persons
         data['total_places_title'] = places
 
     else:
+        for x in data['body']:
+            tokens = word_tokenize(x)
+            tags = st.tag(tokens)
+            tagged_titles.append(tags)
+
+        for pair_list in tagged_titles:
+            person_count = 0
+            place_count = 0
+            for pair in pair_list:
+                if pair[1] == 'PERSON':
+                    person_count +=1
+                elif pair[1] == 'LOCATION':
+                    place_count +=1
+                else:
+                    continue
+            persons.append(person_count)
+            places.append(place_count)
+
         data['total_persons_body'] = persons
         data['total_places_body'] = places
 
@@ -254,7 +305,11 @@ def evaluate_entities(data = None, section = None, source = None):
 
 
 class EvaluateTime():
-
+    '''
+    Usage:
+    >>> et = EvaluateTime(data = data, source = 'NYT', section = 'politics', topic = 'health')
+    >>> et.plot_time()
+    '''
     def __init__(self, data = None, section = None, source = None, topic = None, date = None):
         self.data = data
         self.section = section
@@ -264,7 +319,7 @@ class EvaluateTime():
 
     def call(self):
         #self.plot_date_dict,
-        self.range_date_dict = self.make_dict()
+        self.range_date_dict, self.groupings = self.make_dict()
         return self
 
     def make_dict(self):
@@ -276,6 +331,7 @@ class EvaluateTime():
         # initialize lists for plot_date_dict
         topic_scores = []
         dates = []
+        groupings = []
 
         # initialize other dict
         range_date_dict = {}
@@ -300,18 +356,21 @@ class EvaluateTime():
             for i, row in masked_data.iterrows():
 
                 if self.topic in row[2]:
-                    topic_scores.append(row[6])
+                    topic_scores.append(row[6]) #body score
                     dates.append(row[1])
+                    score_title_date = (row[0], row[1], row[6])
+                    groupings.append(score_title_date)
 
-                    # add to range_date_dict where keys are the dates and the vales are a list of scores
+
+                    # add to range_date_dict where keys are the dates and the values are a list of scores
                     if row[1] not in range_date_dict.keys():
                         range_date_dict[row[1]] = [row[6]]
 
                     elif row[1] in range_date_dict.keys():
                         (range_date_dict[row[1]]).append(row[6])
 
-        #plot_date_dict = {'date': dates, 'score': topic_scores}
-        return range_date_dict #plot_date_dict,
+        return range_date_dict, groupings
+
 
     def plot_time(self):
 
