@@ -15,28 +15,28 @@ Methods:
 **get_sent_scores()** filters ArticleData object by source, section, and for a particular topic.
 
   Parameters:
-  data = EvaluateTime object
-  source = newspaper of choice ('Fox', 'NYT', 'WP')
-  section = condensed section name ('world', 'politics', 'sci_health', 'entertainment', 'opinion', 'sports', 'bus_tech', 'education', 'other')
-  topic = string containing keyword of your choice
+  data = EvaluateTime object\n
+  source = newspaper of choice ('Fox', 'NYT', 'WP')\n
+  section = condensed section name ('world',\n 'politics', 'sci_health', 'entertainment',\n 'opinion', 'sports', 'bus_tech', 'education', 'other')\n
+  topic = string containing keyword of your choice\n
 
 
   Returns: dictionary of scores for articles in section, from source containing the topic, and not containing the topic
 
 **count_entities()** counts total persons and places mentioned in ArticleData object.
 
-  Parameters:
-  data = EvaluateTime object
-  title = Boolean, whether or to count in title or body of articles
+  Parameters:\n
+  data = EvaluateTime object\n
+  title = Boolean, whether or to count in title or body of articles\n
 
-  Returns: EvaluateTime object with columns for count of persons and places
+  Returns: EvaluateTime object with columns for count of persons and places\n
 
 **evaluate_entities()** identifies which persons or places are mentioned in a particular section or source.
 
-  Parameters:
-  data = EvaluateTime object
-  section = condensed section name ('world', 'politics', 'sci_health', 'entertainment', 'opinion', 'sports', 'bus_tech', 'education', 'other')
-  source = source = newspaper of choice ('Fox', 'NYT', 'WP')
+  Parameters:\n
+  data = EvaluateTime object\n
+  section = condensed section name ('world', 'politics', 'sci_health', 'entertainment', 'opinion', 'sports', 'bus_tech', 'education', 'other')\n
+  source = source = newspaper of choice ('Fox', 'NYT', 'WP')\n
 
   Returns: dictionaries containing count of each person and count of each place
 
@@ -44,30 +44,30 @@ Methods:
 
 Class to facilitate evaluating sentiment scores of articles on a particular topic over time.
 
-Parameters:
+Parameters:\n
 data = ArticleData object with SA columns
-section
-section = condensed section name ('world', 'politics', 'sci_health', 'entertainment', 'opinion', 'sports', 'bus_tech', 'education', 'other')
-source = source = newspaper of choice ('Fox', 'NYT', 'WP')
-topic = keyword of interest
-date = datetime of the earliest date to search for topic
+section\n
+section = condensed section name ('world', 'politics', 'sci_health', 'entertainment', 'opinion', 'sports', 'bus_tech', 'education', 'other')\n
+source = source = newspaper of choice ('Fox', 'NYT', 'WP')\n
+topic = keyword of interest\n
+date = datetime of the earliest date to search for topic\n
 
-Attributes:
+Attributes:\n
 data = EvaluateTime object with SA columns
 section
-section = condensed section name ('world', 'politics', 'sci_health', 'entertainment', 'opinion', 'sports', 'bus_tech', 'education', 'other')
-source = source = newspaper of choice ('Fox', 'NYT', 'WP')
+section = condensed section name ('world', 'politics', 'sci_health', 'entertainment', 'opinion', 'sports', 'bus_tech', 'education', 'other')\n
+source = source = newspaper of choice ('Fox', 'NYT', 'WP')\n
 topic = keyword of interest
-date = datetime of the earliest date to search for topic
-range_date_dict = dictionary where keys are dates and values are list of score for every article in parent ArticleData object
-groupings = a list of tuples zipping titles, dates, and sentiment scores
+date = datetime of the earliest date to search for topic\n
+range_date_dict = dictionary where keys are dates and values are list of score for every article in parent ArticleData object\n
+groupings = a list of tuples zipping titles, dates, and sentiment scores\n
 
 
-Methods:
-**call()** assigns groupings and range_date_dict attributes
+Methods:\n
+**call()** assigns groupings and range_date_dict attributes\n
 
-**make_dict()**
-  Returns: range_date_dict, groupings
+**make_dict()**\n
+  Returns: range_date_dict, groupings\n
 
 
 **plot_time()** plots range_date_dict with error bars
