@@ -127,7 +127,7 @@ class SentimentPlotter():
 
                     elif row[1] in range_date_dict.keys():
                         (range_date_dict[row[1]]).append(row[6])
-                return range_date_dict, groupings
+        return range_date_dict, groupings
 
 
 
@@ -240,7 +240,13 @@ class SentimentPlotter():
 
         return min_series, max_series
 
-    def plot_time(self):
+    def plot_topic(self, topic = None, section = None, source = None, date = None):
+        self.topic = topic
+        self.section = section
+        self.source = source
+        self.date = date
+
+        self.range_date_dict, self.groupings = self.make_dict()
 
         x = self.range_date_dict.keys()
         x.sort()
